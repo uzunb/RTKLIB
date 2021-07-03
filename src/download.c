@@ -5,7 +5,6 @@
 *
 * version : $Revision:$ $Date:$
 * history : 2012/12/28  1.0  new
-*           2013/06/02  1.1  replace S_IREAD by S_IRUSR
 *-----------------------------------------------------------------------------*/
 #include <errno.h>
 #include <sys/stat.h>
@@ -134,7 +133,7 @@ static int exist_file(const char *local)
 #else
     struct stat buff;
     if (stat(local,&buff)) return 0;
-    return buff.st_mode&S_IRUSR;
+    return buff.st_mode&S_IREAD;
 #endif
 }
 /* test file existance -------------------------------------------------------*/

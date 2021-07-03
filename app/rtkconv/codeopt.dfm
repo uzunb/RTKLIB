@@ -587,7 +587,7 @@ object CodeOptDialog: TCodeOptDialog
       Caption = '2X'
       TabOrder = 7
     end
-    object J33: TCheckBox
+    object J37: TCheckBox
       Left = 200
       Top = 32
       Width = 40
@@ -612,12 +612,12 @@ object CodeOptDialog: TCodeOptDialog
     Height = 34
     Caption = 'BeiDou'
     TabOrder = 8
-    object C47: TCheckBox
+    object C40: TCheckBox
       Left = 10
       Top = 14
       Width = 35
       Height = 16
-      Caption = '1I'
+      Caption = '2I'
       Enabled = False
       TabOrder = 2
     end
@@ -657,21 +657,21 @@ object CodeOptDialog: TCodeOptDialog
       Enabled = False
       TabOrder = 1
     end
-    object C48: TCheckBox
+    object C41: TCheckBox
       Left = 48
       Top = 14
       Width = 34
       Height = 16
-      Caption = '1Q'
+      Caption = '2Q'
       Enabled = False
       TabOrder = 5
     end
-    object C12: TCheckBox
+    object C18: TCheckBox
       Left = 86
       Top = 14
       Width = 34
       Height = 16
-      Caption = '1X'
+      Caption = '2X'
       Enabled = False
       TabOrder = 6
     end

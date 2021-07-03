@@ -1,7 +1,7 @@
 /*------------------------------------------------------------------------------
 * rtksvr.c : rtk server functions
 *
-*          Copyright (C) 2007-2018 by T.TAKASU, All rights reserved.
+*          Copyright (C) 2007-2013 by T.TAKASU, All rights reserved.
 *
 * options : -DWIN32    use WIN32 API
 *
@@ -21,14 +21,9 @@
 *           2011/01/10  1.5  change api: rtksvrstart(),rtksvrostat()
 *           2011/06/21  1.6  fix ephemeris handover problem
 *           2012/05/14  1.7  fix bugs
-*           2013/03/28  1.8  fix problem on lack of glonass freq number in raw
-*                            fix problem on ephemeris with inverted toe
+*           2013/03/28  1.8  fix program on lack of glonass freq number in raw
+*                            fix program on ephemeris with inverted toe
 *                            add api rtksvrfree()
-*           2014/06/28  1.9  fix probram on ephemeris update of beidou
-*           2018/01/29  1.10 fix probram on ssr orbit/clock inconsistency
-*                            fix bug on ion/utc parameters input
-*                            fix server-crash with server-cycle > 1000
-*                            add rtkfree() in rtksvrfree()
 *-----------------------------------------------------------------------------*/
 #include "rtklib.h"
 
@@ -151,9 +146,7 @@ static void updatesvr(rtksvr_t *svr, int ret, obs_t *obs, nav_t *nav, int sat,
                 eph2=svr->nav.eph+sat-1;
                 eph3=svr->nav.eph+sat-1+MAXSAT;
                 if (eph2->ttr.time==0||
-                    (eph1->iode!=eph3->iode&&eph1->iode!=eph2->iode)||
-                    (timediff(eph1->toe,eph3->toe)!=0.0&&
-                     timediff(eph1->toe,eph2->toe)!=0.0)) {
+                    (eph1->iode!=eph3->iode&&eph1->iode!=eph2->iode)) {
                     *eph3=*eph2;
                     *eph2=*eph1;
                     updatenav(&svr->nav);
@@ -191,7 +184,7 @@ static void updatesvr(rtksvr_t *svr, int ret, obs_t *obs, nav_t *nav, int sat,
         svr->nmsg[index][3]++;
     }
     else if (ret==9) { /* ion/utc parameters */
-        if (svr->navsel==0||svr->navsel==index+1) {
+        if (svr->navsel==index||svr->navsel>=3) {
             for (i=0;i<8;i++) svr->nav.ion_gps[i]=nav->ion_gps[i];
             for (i=0;i<4;i++) svr->nav.utc_gps[i]=nav->utc_gps[i];
             for (i=0;i<4;i++) svr->nav.ion_gal[i]=nav->ion_gal[i];
@@ -231,11 +224,6 @@ static void updatesvr(rtksvr_t *svr, int ret, obs_t *obs, nav_t *nav, int sat,
     else if (ret==10) { /* ssr message */
         for (i=0;i<MAXSAT;i++) {
             if (!svr->rtcm[index].ssr[i].update) continue;
-            
-            /* check consistency between iods of orbit and clock */
-            if (svr->rtcm[index].ssr[i].iod[0]!=
-                svr->rtcm[index].ssr[i].iod[1]) continue;
-            
             svr->rtcm[index].ssr[i].update=0;
             
             iode=svr->rtcm[index].ssr[i].iode;
@@ -391,7 +379,7 @@ static void *rtksvrthread(void *arg)
     obs_t obs;
     obsd_t data[MAXOBS*2];
     double tt;
-    unsigned int tick,ticknmea,tick1hz;
+    unsigned int tick,ticknmea;
     unsigned char *p,*q;
     int i,j,n,fobs[3]={0},cycle,cputime;
     
@@ -399,7 +387,7 @@ static void *rtksvrthread(void *arg)
     
     svr->state=1; obs.data=data;
     svr->tick=tickget();
-    ticknmea=tick1hz=svr->tick-1000;
+    ticknmea=svr->tick-1000;
     
     for (cycle=0;svr->state;cycle++) {
         tick=tickget();
@@ -463,9 +451,8 @@ static void *rtksvrthread(void *arg)
             }
         }
         /* send null solution if no solution (1hz) */
-        if (svr->rtk.sol.stat==SOLQ_NONE&&(int)(tick-tick1hz)>=1000) {
+        if (svr->rtk.sol.stat==SOLQ_NONE&&cycle%(1000/svr->cycle)==0) {
             writesol(svr,0);
-            tick1hz=tick;
         }
         /* send nmea request to base/nrtk input stream */
         if (svr->nmeacycle>0&&(int)(tick-ticknmea)>=svr->nmeacycle) {
@@ -580,7 +567,6 @@ extern void rtksvrfree(rtksvr_t *svr)
     for (i=0;i<3;i++) for (j=0;j<MAXOBSBUF;j++) {
         free(svr->obs[i][j].data);
     }
-    rtkfree(&svr->rtk);
 }
 /* lock/unlock rtk server ------------------------------------------------------
 * lock/unlock rtk server

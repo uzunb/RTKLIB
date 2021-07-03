@@ -164,7 +164,7 @@ void __fastcall TMainWindow::SetOutFiles(AnsiString infile)
         if ((p=strrchr(ofile[0],'\\'))) *(p+1)='\0';
         else ofile[0][0]='\0';
         sprintf(ofile[1],"%s%%r%%n0.%%yO",ofile[0]);
-        if (RnxVer>=3&&NavSys&&(NavSys!=SYS_GPS)) { /* ver.3 and mixed system */
+        if (RnxVer>=2&&NavSys&&(NavSys!=SYS_GPS)) { /* ver.3 and mixed system */
             sprintf(ofile[2],"%s%%r%%n0.%%yP",ofile[0]);
         }
         else {
@@ -653,19 +653,19 @@ void __fastcall TMainWindow::UpdateEnable(void)
     TimeUnitF      ->Enabled=TimeStartF->Checked&&TimeEndF->Checked;
     TimeUnit       ->Enabled=TimeStartF->Checked&&TimeEndF->Checked&&TimeUnitF->Checked;
     LabelTimeUnit  ->Enabled=TimeUnit  ->Enabled;
-    OutFileEna3    ->Enabled=RnxVer<3&&(NavSys&SYS_GLO);
-    OutFileEna4    ->Enabled=RnxVer<3&&(NavSys&SYS_SBS);
-    OutFileEna5    ->Enabled=RnxVer<3&&(NavSys&SYS_QZS);
-    OutFileEna6    ->Enabled=RnxVer<3&&(NavSys&SYS_GAL);
+    OutFileEna3    ->Enabled=RnxVer<2&&(NavSys&SYS_GLO);
+    OutFileEna4    ->Enabled=RnxVer<2&&(NavSys&SYS_SBS);
+    OutFileEna5    ->Enabled=RnxVer<2&&(NavSys&SYS_QZS);
+    OutFileEna6    ->Enabled=RnxVer<2&&(NavSys&SYS_GAL);
     OutFileEna7    ->Enabled=!rnx;
     OutDir         ->Enabled=OutDirEna  ->Checked;
     LabelOutDir    ->Enabled=OutDirEna  ->Checked;
     OutFile1       ->Enabled=OutFileEna1->Checked;
     OutFile2       ->Enabled=OutFileEna2->Checked;
-    OutFile3       ->Enabled=OutFileEna3->Checked&&RnxVer<3&&(NavSys&SYS_GLO);
-    OutFile4       ->Enabled=OutFileEna4->Checked&&RnxVer<3&&(NavSys&SYS_SBS);
-    OutFile5       ->Enabled=OutFileEna5->Checked&&RnxVer<3&&(NavSys&SYS_QZS);
-    OutFile6       ->Enabled=OutFileEna6->Checked&&RnxVer<3&&(NavSys&SYS_GAL);
+    OutFile3       ->Enabled=OutFileEna3->Checked&&RnxVer<2&&(NavSys&SYS_GLO);
+    OutFile4       ->Enabled=OutFileEna4->Checked&&RnxVer<2&&(NavSys&SYS_SBS);
+    OutFile5       ->Enabled=OutFileEna5->Checked&&RnxVer<2&&(NavSys&SYS_QZS);
+    OutFile6       ->Enabled=OutFileEna6->Checked&&RnxVer<2&&(NavSys&SYS_GAL);
     OutFile7       ->Enabled=OutFileEna7->Checked&&!rnx;
     BtnOutDir      ->Enabled=OutDirEna  ->Checked;
     BtnOutFile1    ->Enabled=OutFile1->Enabled;
@@ -718,7 +718,6 @@ void __fastcall TMainWindow::ConvertFile(void)
         else if (!strcmp(p,".jps"  )) format=STRFMT_JAVAD;
         else if (!strcmp(p,".bnx"  )) format=STRFMT_BINEX;
         else if (!strcmp(p,".binex")) format=STRFMT_BINEX;
-        else if (!strcmp(p,".rt17" )) format=STRFMT_RT17;
         else if (!strcmp(p,".obs"  )) format=STRFMT_RINEX;
         else if (!strcmp(p,".OBS"  )) format=STRFMT_RINEX;
         else if (!strcmp(p,".nav"  )) format=STRFMT_RINEX;
@@ -752,7 +751,7 @@ void __fastcall TMainWindow::ConvertFile(void)
     }
     rnxopt.rnxver=RNXVER[RnxVer];
     
-    if (format==STRFMT_RTCM2||format==STRFMT_RTCM3||format==STRFMT_RT17) {
+    if (format==STRFMT_RTCM2||format==STRFMT_RTCM3) {
         
         // input start date/time for rtcm 2 ro rtcm 3
         if (StartDialog->ShowModal()!=mrOk) return;

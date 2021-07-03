@@ -47,14 +47,10 @@
 #include "console.h"
 #include "pntdlg.h"
 #include "mapdlg.h"
-#include "skydlg.h"
 #include "geview.h"
 #include "gmview.h"
 #include "viewer.h"
 #pragma link "SHDocVw_OCX"
-
-#define YLIM_AGE    10.0            // ylimit of age of differential
-#define YLIM_RATIO  20.0            // ylimit of raito factor
 
 // instance of TPLOT --------------------------------------------------------
 TPlot *Plot;
@@ -108,8 +104,6 @@ __fastcall TPlot::TPlot(TComponent* Owner) : TForm(Owner)
     NavFiles   =new TStringList;
     Buff    =new Graphics::TBitmap;
     MapImage=new Graphics::TBitmap;
-    SkyImageI=new Graphics::TBitmap;
-    SkyImageR=new Graphics::TBitmap;
     GraphT =new TGraph(Disp);
     GraphT->Fit=0;
     
@@ -132,13 +126,6 @@ __fastcall TPlot::TPlot(TComponent* Owner) : TForm(Owner)
     MapScaleEq=0;
     MapLat=MapLon=0.0;
     
-    SkySize[0]=SkySize[1]=SkyCent[0]=SkyCent[1]=0;
-    SkyScale=SkyScaleR=240.0;
-    SkyFov[0]=SkyFov[1]=SkyFov[2]=0.0;
-    SkyElMask=1;
-    SkyDestCorr=SkyRes=SkyFlip=0;
-    for (i=0;i<10;i++) SkyDest[i]=0.0;
-    
     for (i=0;i<3;i++) TimeEna[i]=0;
     TimeLabel=AutoScale=ShowStats=0;
     ShowLabel=ShowGLabel=1;
@@ -146,7 +133,6 @@ __fastcall TPlot::TPlot(TComponent* Owner) : TForm(Owner)
     PlotStyle=MarkSize=Origin=RcvPos=0;
     TimeInt=ElMask=YRange=0.0;
     MaxDop=30.0;
-    MaxMP=10.0;
     TimeStart=TimeEnd=epoch2time(ep);
     DoubleBuffered=true;
     Console1=new TConsole(Owner);
@@ -303,12 +289,7 @@ void __fastcall TPlot::DropFiles(TWMDropFiles msg)
     if (n==1&&(ext=strrchr(file,'.'))&&
         (!strcmp(ext,".jpg")||!strcmp(ext,".jpeg")||
          !strcmp(ext,".JPG")||!strcmp(ext,".JPEG"))) {
-        if (PlotType==PLOT_TRK) {
-            ReadMapData(files->Strings[0]);
-        }
-        else if (PlotType==PLOT_SKY||PlotType==PLOT_MPS) {
-            ReadSkyData(files->Strings[0]);
-        }
+        ReadMapData(files->Strings[0]);
     }
     else if (CheckObs((s=file))) {
         ReadObs(files);
@@ -344,7 +325,6 @@ void __fastcall TPlot::MenuOpenMapImageClick(TObject *Sender)
 {
     trace(3,"MenuOpenMapImage\n");
     
-    OpenMapDialog->Title="Open Map Image";
     OpenMapDialog->FileName=MapImageFile;
     if (!OpenMapDialog->Execute()) return;
     ReadMapData(OpenMapDialog->FileName);
@@ -356,16 +336,6 @@ void __fastcall TPlot::MenuOpenMapPathClick(TObject *Sender)
     
     if (!OpenMapPathDialog->Execute()) return;
     ReadMapPath(OpenMapPathDialog->FileName);
-}
-// callback on menu-open-sky-image ------------------------------------------
-void __fastcall TPlot::MenuOpenSkyImageClick(TObject *Sender)
-{
-    trace(3,"MenuOpenSkyImage\n");
-    
-    OpenMapDialog->Title="Open Sky Image";
-    OpenMapDialog->FileName=SkyImageFile;
-    if (!OpenMapDialog->Execute()) return;
-    ReadSkyData(OpenMapDialog->FileName);
 }
 // callback on menu-open-obs-data -------------------------------------------
 void __fastcall TPlot::MenuOpenObsClick(TObject *Sender)
@@ -428,23 +398,8 @@ void __fastcall TPlot::MenuFileSelClick(TObject *Sender)
 // callback on menu-save image ----------------------------------------------
 void __fastcall TPlot::MenuSaveImageClick(TObject *Sender)
 {
-    char file[1024],*ext;
-    
     if (!SaveImageDialog->Execute()) return;
-    
-    strcpy(file,U2A(SaveImageDialog->FileName).c_str());
-    
-    if ((ext=strrchr(file,'.'))&&
-        (!strcmp(ext,".jpg")||!strcmp(ext,".jpeg")||
-         !strcmp(ext,".JPG")||!strcmp(ext,".JPEG"))) {
-        TJPEGImage *image=new TJPEGImage;
-        image->Assign(Buff);
-        image->SaveToFile(SaveImageDialog->FileName);
-        delete image;
-    }
-    else {
-        Buff->SaveToFile(SaveImageDialog->FileName);
-    }
+    Buff->SaveToFile(SaveImageDialog->FileName);
 }
 // callback on menu-save-# of sats/dop --------------------------------------
 void __fastcall TPlot::MenuSaveDopClick(TObject *Sender)
@@ -619,13 +574,6 @@ void __fastcall TPlot::MenuMapImgClick(TObject *Sender)
     trace(3,"MenuMapImgClick\n");
     
     MapAreaDialog->Show();
-}
-// callback on menu-sky image -----------------------------------------------
-void __fastcall TPlot::MenuSkyImgClick(TObject *Sender)
-{
-    trace(3,"MenuSkyImgClick\n");
-    
-    SkyImgDialog->Show();
 }
 // callback on menu-solution-source -----------------------------------------
 void __fastcall TPlot::MenuSrcSolClick(TObject *Sender)
@@ -838,14 +786,6 @@ void __fastcall TPlot::MenuFitVertClick(TObject *Sender)
     FitRange(0);
     Refresh();
 }
-// callback on menu-show-skyplot --------------------------------------------
-void __fastcall TPlot::MenuShowSkyplotClick(TObject *Sender)
-{
-    trace(3,"MenuShowSkyplotClick\n");
-    
-    BtnShowSkyplot->Down=!BtnShowSkyplot->Down;
-    UpdatePlot();
-}
 // callback on menu-show-map-image ------------------------------------------
 void __fastcall TPlot::MenuShowMapClick(TObject *Sender)
 {
@@ -981,15 +921,6 @@ void __fastcall TPlot::BtnShowMapClick(TObject *Sender)
 {
     trace(3,"BtnShowMapClick\n");
     
-    UpdateEnable();
-    Refresh();
-}
-//---------------------------------------------------------------------------
-void __fastcall TPlot::BtnShowSkyplotClick(TObject *Sender)
-{
-    trace(3,"BtnShowSkyplotClick\n");
-    
-	UpdateEnable();
     Refresh();
 }
 // callback on button-plot-1-onoff ------------------------------------------
@@ -1730,7 +1661,6 @@ void __fastcall TPlot::TimerTimer(TObject *Sender)
     else return;
     
     UpdateTime();
-    UpdatePlot();
 }
 // set center of x-axis -----------------------------------------------------
 void __fastcall TPlot::SetCentX(double c)
@@ -2024,7 +1954,7 @@ void __fastcall TPlot::UpdateEnable(void)
     
     QFlag          ->Visible=PlotType<=PLOT_NSAT;
     ObsType        ->Visible=PlotType==PLOT_OBS||PlotType<=PLOT_SKY;
-    ObsType2       ->Visible=PlotType==PLOT_SNR||PlotType==PLOT_SNRE||PlotType==PLOT_MPS;
+    ObsType2       ->Visible=PlotType==PLOT_SNR||PlotType==PLOT_SNRE;
     ObsType        ->Enabled=!SimObs;
     ObsType2       ->Enabled=!SimObs;
     FrqType        ->Visible=PlotType==PLOT_RES;
@@ -2060,10 +1990,7 @@ void __fastcall TPlot::UpdateEnable(void)
                                     PlotType==PLOT_DOP ||PlotType==PLOT_RES ||
                                     PlotType==PLOT_SNR);
     BtnFixVert     ->Enabled=data&&plot&&PlotType!=PLOT_TRK&&PlotType!=PLOT_NSAT;
-    BtnShowSkyplot ->Visible=PlotType==PLOT_SKY||PlotType==PLOT_MPS;
-    BtnShowMap     ->Enabled=(PlotType==PLOT_TRK&&MapImage->Height>0&&!BtnSol12->Down)||
-                             (PlotType==PLOT_SKY&&SkyImageI->Height>0)||
-                             (PlotType==PLOT_MPS&&SkyImageI->Height>0);
+    BtnShowMap     ->Enabled=PlotType==PLOT_TRK&&MapImage->Height>0&&!BtnSol12->Down;
     BtnShowPoint   ->Enabled=(PlotType==PLOT_TRK)&&!BtnSol12->Down;
     BtnAnimate     ->Enabled=data&&BtnShowTrack->Down;
     BtnGE          ->Enabled=SolData[0].n>0||SolData[1].n>0;
@@ -2076,7 +2003,6 @@ void __fastcall TPlot::UpdateEnable(void)
         BtnFixCent ->Enabled=false;
     }
     MenuMapImg     ->Enabled=MapImage->Height>0;
-    MenuSkyImg     ->Enabled=SkyImageI->Height>0;
     MenuSrcSol     ->Enabled=SolFiles[sel]->Count>0;
     MenuSrcObs     ->Enabled=ObsFiles->Count>0;
     MenuQcObs      ->Enabled=ObsFiles->Count>0;
@@ -2089,8 +2015,6 @@ void __fastcall TPlot::UpdateEnable(void)
     MenuFixHoriz   ->Enabled=BtnFixHoriz ->Enabled;
     MenuFixVert    ->Enabled=BtnFixVert  ->Enabled;
     MenuShowPoint  ->Enabled=BtnShowPoint->Enabled;
-    MenuShowMap    ->Enabled=BtnShowMap  ->Enabled;
-    MenuShowSkyplot->Enabled=BtnShowSkyplot->Visible;
     MenuGE         ->Enabled=BtnGE       ->Enabled;
     MenuGM         ->Enabled=BtnGM       ->Enabled;
     
@@ -2099,7 +2023,6 @@ void __fastcall TPlot::UpdateEnable(void)
     MenuFixHoriz   ->Checked=BtnFixHoriz ->Down;
     MenuFixVert    ->Checked=BtnFixVert  ->Down;
     MenuShowPoint  ->Checked=BtnShowPoint->Down;
-    MenuShowSkyplot->Checked=BtnShowSkyplot->Down;
     MenuShowMap    ->Checked=BtnShowMap  ->Down;
     
     MenuAnimStart  ->Enabled=!ConnectState&&BtnAnimate->Enabled&&!BtnAnimate->Down;
@@ -2224,9 +2147,9 @@ void __fastcall TPlot::SetRange(int all, double range)
     else if (PlotType==PLOT_NSAT) {
         GraphG[0]->GetLim(tl,xp);
         xl[0]=yl[0]=zl[0]=0.0;
-        xl[1]=MaxDop;
-        yl[1]=YLIM_AGE;
-        zl[1]=YLIM_RATIO;
+        xl[1]=20.0;
+        yl[1]=10.0;
+        zl[1]=20.0;
         GraphG[0]->SetLim(tl,xl);
         GraphG[1]->SetLim(tl,yl);
         GraphG[2]->SetLim(tl,zl);
@@ -2243,7 +2166,7 @@ void __fastcall TPlot::SetRange(int all, double range)
     else {
         GraphG[0]->GetLim(tl,xp);
         xl[0]=10.0; xl[1]= 60.0;
-        yl[0]=-MaxMP; yl[1]=MaxMP;
+        yl[0]=-10.0; yl[1]=10.0;
         zl[0]= 0.0; zl[1]= 90.0;
         GraphG[0]->SetLim(tl,xl);
         GraphG[1]->SetLim(tl,yl);
@@ -2424,7 +2347,6 @@ void __fastcall TPlot::LoadOpt(void)
     
     ElMask    =ini->ReadFloat  ("plot","elmask", 0.0);
     MaxDop    =ini->ReadFloat  ("plot","maxdop",30.0);
-    MaxMP     =ini->ReadFloat  ("plot","maxmp" ,10.0);
     YRange    =ini->ReadFloat  ("plot","yrange", 5.0);
     Origin    =ini->ReadInteger("plot","orgin",    2);
     RcvPos    =ini->ReadInteger("plot","rcvpos",   0);
@@ -2554,7 +2476,6 @@ void __fastcall TPlot::SaveOpt(void)
     
     ini->WriteFloat  ("plot","elmask",       ElMask        );
     ini->WriteFloat  ("plot","maxdop",       MaxDop        );
-    ini->WriteFloat  ("plot","maxmp",        MaxMP         );
     ini->WriteFloat  ("plot","yrange",       YRange        );
     ini->WriteInteger("plot","orgin",        Origin        );
     ini->WriteInteger("plot","rcvpos",       RcvPos        );

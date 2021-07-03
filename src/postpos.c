@@ -1,7 +1,7 @@
 /*------------------------------------------------------------------------------
 * postpos.c : post-processing positioning
 *
-*          Copyright (C) 2007-2018 by T.TAKASU, All rights reserved.
+*          Copyright (C) 2007-2013 by T.TAKASU, All rights reserved.
 *
 * version : $Revision: 1.1 $ $Date: 2008/07/17 21:48:06 $
 * history : 2007/05/08  1.0  new
@@ -24,10 +24,6 @@
 *           2011/09/15  1.11 add function reading stec file
 *           2012/02/01  1.12 support keyword expansion of rtcm ssr corrections
 *           2013/03/11  1.13 add function reading otl and erp data
-*           2014/06/29  1.14 fix problem on overflow of # of satellites
-*           2015/03/23  1.15 fix bug on ant type replacement by rinex header
-*                            fix bug on combined filter for moving-base mode
-*           2018/01/29  1.16 fix problem on ssr orbit and clock inconsistency
 *-----------------------------------------------------------------------------*/
 #include "rtklib.h"
 
@@ -185,29 +181,6 @@ static int nextobsb(const obs_t *obs, int *i, int rcv)
     }
     return n;
 }
-
-/* input rtcm3 ssr corrections -----------------------------------------------*/
-static void input_ssr(gtime_t time, rtcm_t *rtcm, nav_t *nav, FILE *fp)
-{
-    int i, stat;
-    
-    while (timediff(rtcm->time, time) < 0.0) {
-        
-        if ((stat = input_rtcm3f(rtcm, fp)) < -1) return;
-        
-        if (stat == 10) { /* ssr correction */
-            
-            for (i = 0; i < MAXSAT; i++) {
-                if (!rtcm->ssr[i].update) continue;
-                if (rtcm->ssr[i].iod[0] != rtcm->ssr[i].iod[1] ||
-                    timediff(time, rtcm->ssr[i].t0[0]) < -1E-3) continue;
-                nav->ssr[i] = rtcm->ssr[i];
-                rtcm->ssr[i].update = 0;
-            }
-        }
-    }
-}
-
 /* input obs data, navigation messages and sbas correction -------------------*/
 static int inputobs(obsd_t *obs, int solq, const prcopt_t *popt)
 {
@@ -234,8 +207,8 @@ static int inputobs(obsd_t *obs, int solq, const prcopt_t *popt)
                 if (timediff(obss.data[i].time,obss.data[iobsu].time)>DTTOL) break;
         }
         nr=nextobsf(&obss,&iobsr,2);
-        for (i=0;i<nu&&n<MAXOBS*2;i++) obs[n++]=obss.data[iobsu+i];
-        for (i=0;i<nr&&n<MAXOBS*2;i++) obs[n++]=obss.data[iobsr+i];
+        for (i=0;i<nu&&n<MAXOBS;i++) obs[n++]=obss.data[iobsu+i];
+        for (i=0;i<nr&&n<MAXOBS;i++) obs[n++]=obss.data[iobsr+i];
         iobsu+=nu;
         
         /* update sbas corrections */
@@ -273,7 +246,10 @@ static int inputobs(obsd_t *obs, int solq, const prcopt_t *popt)
                 }
             }
             if (fp_rtcm) {
-                input_ssr(obs[0].time, &rtcm, &navs, fp_rtcm);
+                while (timediff(rtcm.time,obs[0].time)<0.0) {
+                    if (input_rtcm3f(&rtcm,fp_rtcm)<-1) break;
+                }
+                for (i=0;i<MAXSAT;i++) navs.ssr[i]=rtcm.ssr[i];
             }
         }
     }
@@ -288,8 +264,8 @@ static int inputobs(obsd_t *obs, int solq, const prcopt_t *popt)
                 if (timediff(obss.data[i].time,obss.data[iobsu].time)<-DTTOL) break;
         }
         nr=nextobsb(&obss,&iobsr,2);
-        for (i=0;i<nu&&n<MAXOBS*2;i++) obs[n++]=obss.data[iobsu-nu+1+i];
-        for (i=0;i<nr&&n<MAXOBS*2;i++) obs[n++]=obss.data[iobsr-nr+1+i];
+        for (i=0;i<nu&&n<MAXOBS;i++) obs[n++]=obss.data[iobsu-nu+1+i];
+        for (i=0;i<nr&&n<MAXOBS;i++) obs[n++]=obss.data[iobsr-nr+1+i];
         iobsu-=nu;
         
         /* update sbas corrections */
@@ -319,7 +295,7 @@ static void procpos(FILE *fp, const prcopt_t *popt, const solopt_t *sopt,
     gtime_t time={0};
     sol_t sol={{0}};
     rtk_t rtk;
-    obsd_t obs[MAXOBS*2]; /* for rover and base */
+    obsd_t obs[MAXOBS];
     double rb[3]={0};
     int i,nobs,n,solstatic,pri[]={0,1,2,3,4,5,1,6};
     
@@ -402,7 +378,7 @@ static void combres(FILE *fp, const prcopt_t *popt, const solopt_t *sopt)
 {
     gtime_t time={0};
     sol_t sols={{0}},sol={{0}};
-    double tt,Qf[9],Qb[9],Qs[9],rbs[3]={0},rb[3]={0},rr_f[3],rr_b[3],rr_s[3];
+    double tt,Qf[9],Qb[9],Qs[9],rbs[3]={0},rb[3]={0};
     int i,j,k,solstatic,pri[]={0,1,2,3,4,5,1,6};
     
     trace(3,"combres : isolf=%d isolb=%d\n",isolf,isolb);
@@ -451,15 +427,8 @@ static void combres(FILE *fp, const prcopt_t *popt, const solopt_t *sopt)
             Qb[5]=Qb[7]=solb[j].qr[4];
             Qb[2]=Qb[6]=solb[j].qr[5];
             
-            if (popt->mode==PMODE_MOVEB) {
-                for (k=0;k<3;k++) rr_f[k]=solf[i].rr[k]-rbf[k+i*3];
-                for (k=0;k<3;k++) rr_b[k]=solb[j].rr[k]-rbb[k+j*3];
-                if (smoother(rr_f,Qf,rr_b,Qb,3,rr_s,Qs)) continue;
-                for (k=0;k<3;k++) sols.rr[k]=rbs[k]+rr_s[k];
-            }
-            else {
-                if (smoother(solf[i].rr,Qf,solb[j].rr,Qb,3,sols.rr,Qs)) continue;
-            }
+            if (smoother(solf[i].rr,Qf,solb[j].rr,Qb,3,sols.rr,Qs)) continue;
+            
             sols.qr[0]=(float)Qs[0];
             sols.qr[1]=(float)Qs[4];
             sols.qr[2]=(float)Qs[8];
@@ -747,6 +716,8 @@ static int antpos(prcopt_t *opt, int rcvno, const obs_t *obs, const nav_t *nav,
 static int openses(const prcopt_t *popt, const solopt_t *sopt,
                    const filopt_t *fopt, nav_t *nav, pcvs_t *pcvs, pcvs_t *pcvr)
 {
+    fprintf(stdout," open procssing session\n");
+
     char *ext;
     
     trace(3,"openses :\n");
@@ -827,7 +798,7 @@ static void setpcv(gtime_t time, prcopt_t *popt, nav_t *nav, const pcvs_t *pcvs,
         if (!(satsys(i+1,NULL)&popt->navsys)) continue;
         if (!(pcv=searchpcv(i+1,"",time,pcvs))) {
             satno2id(i+1,id);
-            trace(3,"no satellite antenna pcv: %s\n",id);
+            trace(2,"no satellite antenna pcv: %s\n",id);
             continue;
         }
         nav->pcvs[i]=*pcv;
@@ -899,6 +870,8 @@ static int execses(gtime_t ts, gtime_t te, double ti, const prcopt_t *popt,
                    const solopt_t *sopt, const filopt_t *fopt, int flag,
                    char **infile, const int *index, int n, char *outfile)
 {
+    fprintf(stdout,"execute processing session\n");
+
     FILE *fp;
     prcopt_t popt_=*popt;
     char tracefile[1024],statfile[1024];
@@ -922,7 +895,7 @@ static int execses(gtime_t ts, gtime_t te, double ti, const prcopt_t *popt,
     if (!readobsnav(ts,te,ti,infile,index,n,&popt_,&obss,&navs,stas)) return 0;
     
     /* set antenna paramters */
-    if (popt_.mode!=PMODE_SINGLE) {
+    if (popt_.sateph==EPHOPT_PREC||popt_.sateph==EPHOPT_SSRCOM) {
         setpcv(obss.n>0?obss.data[0].time:timeget(),&popt_,&navs,&pcvss,&pcvsr,
                stas);
     }
@@ -1005,6 +978,8 @@ static int execses_r(gtime_t ts, gtime_t te, double ti, const prcopt_t *popt,
                      char **infile, const int *index, int n, char *outfile,
                      const char *rov)
 {
+    fprintf(stdout,"execute processing session for each rover\n");
+
     gtime_t t0={0};
     int i,stat=0;
     char *ifile[MAXINFILE],ofile[1024],*rov_,*p,*q,s[64]="";
@@ -1055,6 +1030,8 @@ static int execses_b(gtime_t ts, gtime_t te, double ti, const prcopt_t *popt,
                      char **infile, const int *index, int n, char *outfile,
                      const char *rov, const char *base)
 {
+    fprintf(stdout,"execute processing session for each base station\n");
+
     gtime_t t0={0};
     int i,stat=0;
     char *ifile[MAXINFILE],ofile[1024],*base_,*p,*q,s[64];
@@ -1156,6 +1133,9 @@ extern int postpos(gtime_t ts, gtime_t te, double ti, double tu,
                    const filopt_t *fopt, char **infile, int n, char *outfile,
                    const char *rov, const char *base)
 {
+
+    fprintf(stdout,"post-processing positioning\n");
+
     gtime_t tts,tte,ttte;
     double tunit,tss;
     int i,j,k,nf,stat=0,week,flag=1,index[MAXINFILE]={0};
@@ -1236,8 +1216,7 @@ extern int postpos(gtime_t ts, gtime_t te, double ti, double tu,
     else if (ts.time!=0) {
         for (i=0;i<n&&i<MAXINFILE;i++) {
             if (!(ifile[i]=(char *)malloc(1024))) {
-                for (;i>=0;i--) free(ifile[i]);
-                return -1;
+                for (;i>=0;i--) free(ifile[i]); return -1;
             }
             reppath(infile[i],ifile[i],ts,"","");
             index[i]=i;

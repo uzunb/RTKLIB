@@ -1,7 +1,7 @@
 /*------------------------------------------------------------------------------
 * rtkpos.c : precise positioning
 *
-*          Copyright (C) 2007-2018 by T.TAKASU, All rights reserved.
+*          Copyright (C) 2007-2013 by T.TAKASU, All rights reserved.
 *
 * version : $Revision: 1.1 $ $Date: 2008/07/17 21:48:06 $
 * history : 2007/01/12 1.0  new
@@ -27,14 +27,6 @@
 *                           add slip detectior by L1-L5 gf jump
 *                           output snr of rover receiver in residuals
 *           2013/03/10 1.12 add otl and pole tides corrections
-*           2014/05/26 1.13 support beidou and galileo
-*                           add output of gal-gps and bds-gps time offset
-*           2014/05/28 1.14 fix bug on memory exception with many sys and freq
-*           2014/08/26 1.15 add functino to swap sol-stat file with keywords
-*           2014/10/21 1.16 fix bug on beidou amb-res with pos2-bdsarmode=0
-*           2014/11/08 1.17 fix bug on ar-degradation by unhealthy satellites
-*           2015/03/23 1.18 residuals referenced to reference satellite
-*           2018/01/29 1.19 unfix ambiguity between gps and qzss
 *-----------------------------------------------------------------------------*/
 #include <stdarg.h>
 #include "rtklib.h"
@@ -101,16 +93,12 @@ extern int resamb_TCAR(rtk_t *rtk, const obsd_t *obs, const int *sat,
 /* global variables ----------------------------------------------------------*/
 static int statlevel=0;          /* rtk status output level (0:off) */
 static FILE *fp_stat=NULL;       /* rtk status file pointer */
-static char file_stat[1024]="";  /* rtk status file original path */
-static gtime_t time_stat={0};    /* rtk status file time */
 
 /* open solution status file ---------------------------------------------------
 * open solution status file and set output level
 * args   : char     *file   I   rtk status file
 *          int      level   I   rtk status level (0: off)
 * return : status (1:ok,0:error)
-* notes  : file can constain time keywords (%Y,%y,%m...) defined in reppath().
-*          The time to replace keywords is based on UTC of CPU time.
 * output : solution status file record format
 *
 *   $POS,week,tow,stat,posx,posy,posz,posxf,posyf,poszf
@@ -130,10 +118,9 @@ static gtime_t time_stat={0};    /* rtk status file time */
 *   $CLK,week,tow,stat,clk1,clk2,clk3,clk4
 *          week/tow : gps week no/time of week (s)
 *          stat     : solution status
-*          clk1     : receiver clock bias GPS (ns)
-*          clk2     : receiver clock bias GLO-GPS (ns)
-*          clk3     : receiver clock bias GAL-GPS (ns)
-*          clk4     : receiver clock bias BDS-GPS (ns)
+*          clk1     : receiver clock bias GPS (m)
+*          clk2     : receiver clock bias GLONASS (m)
+*          clk3,clk4: reserved
 *
 *   $ION,week,tow,stat,sat,az,el,ion,ion-fixed
 *          week/tow : gps week no/time of week (s)
@@ -175,21 +162,13 @@ static gtime_t time_stat={0};    /* rtk status file time */
 *-----------------------------------------------------------------------------*/
 extern int rtkopenstat(const char *file, int level)
 {
-    gtime_t time=utc2gpst(timeget());
-    char path[1024];
-    
     trace(3,"rtkopenstat: file=%s level=%d\n",file,level);
     
     if (level<=0) return 0;
-    
-    reppath(file,path,time,"","");
-    
-    if (!(fp_stat=fopen(path,"w"))) {
-        trace(1,"rtkopenstat: file open error path=%s\n",path);
+    if (!(fp_stat=fopen(file,"w"))) {
+        trace(1,"rtkopenstat: file open error file=%s\n",file);
         return 0;
     }
-    strcpy(file_stat,file);
-    time_stat=time;
     statlevel=level;
     return 1;
 }
@@ -204,31 +183,7 @@ extern void rtkclosestat(void)
     
     if (fp_stat) fclose(fp_stat);
     fp_stat=NULL;
-    file_stat[0]='\0';
     statlevel=0;
-}
-/* swap solution status file -------------------------------------------------*/
-static void swapsolstat(void)
-{
-    gtime_t time=utc2gpst(timeget());
-    char path[1024];
-    
-    if ((int)(time2gpst(time     ,NULL)/INT_SWAP_STAT)==
-        (int)(time2gpst(time_stat,NULL)/INT_SWAP_STAT)) {
-        return;
-    }
-    time_stat=time;
-    
-    if (!reppath(file_stat,path,time,"","")) {
-        return;
-    }
-    if (fp_stat) fclose(fp_stat);
-    
-    if (!(fp_stat=fopen(path,"w"))) {
-        trace(2,"swapsolstat: file open error path=%s\n",path);
-        return;
-    }
-    trace(3,"swapsolstat: path=%s\n",path);
 }
 /* output solution status ----------------------------------------------------*/
 static void outsolstat(rtk_t *rtk)
@@ -241,9 +196,6 @@ static void outsolstat(rtk_t *rtk)
     if (statlevel<=0||!fp_stat) return;
     
     trace(3,"outsolstat:\n");
-    
-    /* swap solution status file */
-    swapsolstat();
     
     est=rtk->opt.mode>=PMODE_DGPS;
     nfreq=est?nf:1;
@@ -280,8 +232,8 @@ static void outsolstat(rtk_t *rtk)
     }
     /* receiver clocks */
     fprintf(fp_stat,"$CLK,%d,%.3f,%d,%d,%.3f,%.3f,%.3f,%.3f\n",
-            week,tow,rtk->sol.stat,1,rtk->sol.dtr[0]*1E9,rtk->sol.dtr[1]*1E9,
-            rtk->sol.dtr[2]*1E9,rtk->sol.dtr[3]*1E9);
+            week,tow,rtk->sol.stat,1,rtk->sol.dtr[0]*1E9,
+            (rtk->sol.dtr[0]+rtk->sol.dtr[1])*1E9,0.0,0.0);
     
     /* ionospheric parameters */
     if (est&&rtk->opt.ionoopt==IONOOPT_EST) {
@@ -1005,19 +957,6 @@ static double gloicbcorr(int sat1, int sat2, const prcopt_t *opt, double lam1,
     
     return opt->exterr.gloicb[f]*0.01*dfreq; /* (m) */
 }
-/* test navi system (m=0:gps/sbs,1:glo,2:gal,3:bds,4:qzs) --------------------*/
-static int test_sys(int sys, int m)
-{
-    switch (sys) {
-        case SYS_GPS: return m==0;
-        case SYS_QZS: return m==4;
-        case SYS_SBS: return m==0;
-        case SYS_GLO: return m==1;
-        case SYS_GAL: return m==2;
-        case SYS_CMP: return m==3;
-    }
-    return 0;
-}
 /* double-differenced phase/code residuals -----------------------------------*/
 static int ddres(rtk_t *rtk, const nav_t *nav, double dt, const double *x,
                  const double *P, const int *sat, double *y, double *e,
@@ -1026,8 +965,8 @@ static int ddres(rtk_t *rtk, const nav_t *nav, double dt, const double *x,
 {
     prcopt_t *opt=&rtk->opt;
     double bl,dr[3],posu[3],posr[3],didxi=0.0,didxj=0.0,*im;
-    double *tropr,*tropu,*dtdxr,*dtdxu,*Ri,*Rj,lami,lamj,fi,fj,df,*Hi=NULL;
-    int i,j,k,m,f,ff,nv=0,nb[NFREQ*4*2+2]={0},b=0,sysi,sysj,nf=NF(opt);
+    double *tropr,*tropu,*dtdxr,*dtdxu,*Ri,*Rj,s,lami,lamj,fi,fj,df,*Hi=NULL;
+    int i,j,k,m,f,ff,nv=0,nb[NFREQ*2*2+2]={0},b=0,sysi,sysj,nf=NF(opt);
     
     trace(3,"ddres   : dt=%.1f nx=%d ns=%d\n",dt,rtk->nx,ns);
     
@@ -1050,14 +989,14 @@ static int ddres(rtk_t *rtk, const nav_t *nav, double dt, const double *x,
             tropr[i]=prectrop(rtk->sol.time,posr,1,azel+ir[i]*2,opt,x,dtdxr+i*3);
         }
     }
-    for (m=0;m<5;m++) /* m=0:gps/sbs,1:glo,2:gal,3:bds,4:qzs */
+    for (m=0;m<2;m++) /* for each system (0:gps/qzss/sbas,1:glonass) */
     
     for (f=opt->mode>PMODE_DGPS?0:nf;f<nf*2;f++) {
         
         /* search reference satellite with highest elevation */
         for (i=-1,j=0;j<ns;j++) {
             sysi=rtk->ssat[sat[j]-1].sys;
-            if (!test_sys(sysi,m)) continue;
+            if ((m==0&&sysi==SYS_GLO)||(m==1&&sysi!=SYS_GLO)) continue;
             if (!validobs(iu[j],ir[j],f,nf,y)) continue;
             if (i<0||azel[1+iu[j]*2]>=azel[1+iu[i]*2]) i=j;
         }
@@ -1068,7 +1007,7 @@ static int ddres(rtk_t *rtk, const nav_t *nav, double dt, const double *x,
             if (i==j) continue;
             sysi=rtk->ssat[sat[i]-1].sys;
             sysj=rtk->ssat[sat[j]-1].sys;
-            if (!test_sys(sysj,m)) continue;
+            if ((m==0&&sysj==SYS_GLO)||(m==1&&sysj!=SYS_GLO)) continue;
             if (!validobs(iu[j],ir[j],f,nf,y)) continue;
             
             ff=f%nf;
@@ -1165,7 +1104,6 @@ static int ddres(rtk_t *rtk, const nav_t *nav, double dt, const double *x,
             vflg[nv++]=(sat[i]<<16)|(sat[j]<<8)|((f<nf?0:1)<<4)|(f%nf);
             nb[b]++;
         }
-#if 0 /* residuals referenced to reference satellite (2.4.2 p11) */
         /* restore single-differenced residuals assuming sum equal zero */
         if (f<nf) {
             for (j=0,s=0.0;j<MAXSAT;j++) s+=rtk->ssat[j].resc[f];
@@ -1182,7 +1120,6 @@ static int ddres(rtk_t *rtk, const nav_t *nav, double dt, const double *x,
                     rtk->ssat[j].resp[f-nf]-=s;
             }
         }
-#endif
         b++;
     }
     /* end of system loop */
@@ -1249,18 +1186,17 @@ static int ddmat(rtk_t *rtk, double *D)
     }
     for (i=0;i<na;i++) D[i+i*nx]=1.0;
     
-    for (m=0;m<5;m++) { /* m=0:gps/sbs,1:glo,2:gal,3:bds,4:qzs */
+    for (m=0;m<2;m++) { /* 0:gps,1:glonass */
         
         if (m==1&&rtk->opt.glomodear==0) continue;
-        if (m==3&&rtk->opt.bdsmodear==0) continue;
         
         for (f=0,k=na;f<nf;f++,k+=MAXSAT) {
             
             for (i=k;i<k+MAXSAT;i++) {
-                if (rtk->x[i]==0.0||!test_sys(rtk->ssat[i-k].sys,m)||
-                    !rtk->ssat[i-k].vsat[f]) {
-                    continue;
-                }
+                if (rtk->x[i]==0.0||
+                    (m==0&&rtk->ssat[i-k].sys==SYS_GLO)||
+                    (m==1&&rtk->ssat[i-k].sys!=SYS_GLO)) continue;
+                
                 if (rtk->ssat[i-k].lock[f]>0&&!(rtk->ssat[i-k].slip[f]&2)&&
                     rtk->ssat[i-k].azel[1]>=rtk->opt.elmaskar) {
                     rtk->ssat[i-k].fix[f]=2; /* fix */
@@ -1269,12 +1205,11 @@ static int ddmat(rtk_t *rtk, double *D)
                 else rtk->ssat[i-k].fix[f]=1;
             }
             for (j=k;j<k+MAXSAT;j++) {
-                if (i==j||rtk->x[j]==0.0||!test_sys(rtk->ssat[j-k].sys,m)||
-                    !rtk->ssat[j-k].vsat[f]) {
-                    continue;
-                }
+                if (i==j||rtk->x[j]==0.0||
+                    (m==0&&rtk->ssat[j-k].sys==SYS_GLO)||
+                    (m==1&&rtk->ssat[j-k].sys!=SYS_GLO)) continue;
+                
                 if (rtk->ssat[j-k].lock[f]>0&&!(rtk->ssat[j-k].slip[f]&2)&&
-                    rtk->ssat[i-k].vsat[f]&&
                     rtk->ssat[j-k].azel[1]>=rtk->opt.elmaskar) {
                     D[i+(na+nb)*nx]= 1.0;
                     D[j+(na+nb)*nx]=-1.0;
@@ -1298,12 +1233,11 @@ static void restamb(rtk_t *rtk, const double *bias, int nb, double *xa)
     for (i=0;i<rtk->nx;i++) xa[i]=rtk->x [i];
     for (i=0;i<rtk->na;i++) xa[i]=rtk->xa[i];
     
-    for (m=0;m<5;m++) for (f=0;f<nf;f++) {
+    for (m=0;m<2;m++) for (f=0;f<nf;f++) {
         
         for (n=i=0;i<MAXSAT;i++) {
-            if (!test_sys(rtk->ssat[i].sys,m)||rtk->ssat[i].fix[f]!=2) {
-                continue;
-            }
+            if ((m==0&&rtk->ssat[i].sys==SYS_GLO)||
+                (m==1&&rtk->ssat[i].sys!=SYS_GLO)||rtk->ssat[i].fix[f]!=2) continue;
             index[n++]=IB(i+1,f,&rtk->opt);
         }
         if (n<2) continue;
@@ -1325,13 +1259,13 @@ static void holdamb(rtk_t *rtk, const double *xa)
     
     v=mat(nb,1); H=zeros(nb,rtk->nx);
     
-    for (m=0;m<5;m++) for (f=0;f<nf;f++) {
+    for (m=0;m<2;m++) for (f=0;f<nf;f++) {
         
         for (n=i=0;i<MAXSAT;i++) {
-            if (!test_sys(rtk->ssat[i].sys,m)||rtk->ssat[i].fix[f]!=2||
-                rtk->ssat[i].azel[1]<rtk->opt.elmaskhold) {
-                continue;
-            }
+            if ((m==0&&rtk->ssat[i].sys==SYS_GLO)||
+                (m==1&&rtk->ssat[i].sys!=SYS_GLO)||rtk->ssat[i].fix[f]!=2||
+                rtk->ssat[i].azel[1]<rtk->opt.elmaskhold) continue;
+            
             index[n++]=IB(i+1,f,&rtk->opt);
             rtk->ssat[i].fix[f]=3; /* hold */
         }

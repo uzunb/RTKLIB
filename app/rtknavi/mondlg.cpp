@@ -412,7 +412,6 @@ void __fastcall TMonitorDialog::ShowRtk(void)
 	if (rtk.opt.navsys&SYS_GAL) navsys=navsys+"Galileo ";
 	if (rtk.opt.navsys&SYS_QZS) navsys=navsys+"QZSS ";
 	if (rtk.opt.navsys&SYS_SBS) navsys=navsys+"SBAS ";
-	if (rtk.opt.navsys&SYS_CMP) navsys=navsys+"BeiDou ";
 	
 	Label->Caption="";
 	Tbl->RowCount=57;
@@ -515,9 +514,8 @@ void __fastcall TMonitorDialog::ShowRtk(void)
 	Tbl->Cells[0][i  ] ="Time of Receiver Clock Rover";
 	Tbl->Cells[1][i++]=rtk.sol.time.time?tstr:"-";
 	
-	Tbl->Cells[0][i  ] ="Time Sytem Offset/Receiver Bias (GLO-GPS,GAL-GPS,BDS-GPS) (ns)";
-	Tbl->Cells[1][i++]=s.sprintf("%.3f,%.3f,%.3f",rtk.sol.dtr[1]*1E9,rtk.sol.dtr[2]*1E9,
-                                 rtk.sol.dtr[3]*1E9);
+	Tbl->Cells[0][i  ] ="Time Sytem Offset (GLONASS-GPS) (s)";
+	Tbl->Cells[1][i++]=s.sprintf("%.9f",rtk.sol.dtr[1]);
 	
 	Tbl->Cells[0][i  ]="Solution Interval (s)";
 	Tbl->Cells[1][i++]=s.sprintf("%.3f",rtk.tt);
@@ -1217,7 +1215,7 @@ void __fastcall TMonitorDialog::ShowSbsNav(void)
 	Label->Caption="";
 	
 	for (i=0,n=1;i<NSATSBS;i++) {
-		valid=fabs(timediff(time,seph[i].t0))<=MAXDTOE_SBS&&
+		valid=fabs(timediff(time,seph[i].t0)<=MAXDTOE_SBS)&&
 			  seph[i].t0.time&&!seph[i].svh;
 		if (SelSat->ItemIndex==1&&!valid) continue;
 		n++;
@@ -1231,7 +1229,7 @@ void __fastcall TMonitorDialog::ShowSbsNav(void)
 	
 	for (i=0,n=1;i<NSATSBS;i++) {
 		j=0;
-		valid=fabs(timediff(time,seph[i].t0))<=MAXDTOE_SBS&&
+		valid=fabs(timediff(time,seph[i].t0)<=MAXDTOE_SBS)&&
 			  seph[i].t0.time&&!seph[i].svh;
 		if (SelSat->ItemIndex==1&&!valid) continue;
 		prn=MINPRNSBS+i;
@@ -1633,7 +1631,7 @@ void __fastcall TMonitorDialog::ShowSbsFast(void)
 	for (i=0;i<Tbl->RowCount;i++) {
 		j=0;
 		satp=sbssat.sat+i;
-		valid=fabs(timediff(time,satp->fcorr.t0))<=MAXSBSAGEF&&satp->fcorr.t0.time&&
+		valid=fabs(timediff(time,satp->fcorr.t0)<=MAXSBSAGEF)&&satp->fcorr.t0.time&&
 			  0<=satp->fcorr.udre-1&&satp->fcorr.udre-1<14;
 		satno2id(satp->sat,id);
 		Tbl->Cells[j++][i+1]=id;

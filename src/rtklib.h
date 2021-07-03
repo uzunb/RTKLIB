@@ -1,7 +1,7 @@
 /*------------------------------------------------------------------------------
 * rtklib.h : rtklib constants, types and function prototypes
 *
-*          Copyright (C) 2007-2015 by T.TAKASU, All rights reserved.
+*          Copyright (C) 2007-2013 by T.TAKASU, All rights reserved.
 *
 * options : -DENAGLO   enable GLONASS
 *           -DENAGAL   enable Galileo
@@ -48,10 +48,8 @@ extern "C" {
 
 #define VER_RTKLIB  "2.4.2"             /* library version */
 
-#define PATCH_LEVEL "p13"               /* patch level */
-
 #define COPYRIGHT_RTKLIB \
-            "Copyright (C) 2007-2018 by T.Takasu\nAll rights reserved."
+            "Copyright (C) 2007-2013 by T.Takasu\nAll rights reserved."
 
 #define PI          3.1415926535897932  /* pi */
 #define D2R         (PI/180.0)          /* deg to rad */
@@ -81,9 +79,9 @@ extern "C" {
 #define FREQ2_GLO   1.24600E9           /* GLONASS G2 base frequency (Hz) */
 #define DFRQ2_GLO   0.43750E6           /* GLONASS G2 bias frequency (Hz/n) */
 #define FREQ3_GLO   1.202025E9          /* GLONASS G3 frequency (Hz) */
-#define FREQ1_CMP   1.561098E9          /* BeiDou B1 frequency (Hz) */
-#define FREQ2_CMP   1.20714E9           /* BeiDou B2 frequency (Hz) */
-#define FREQ3_CMP   1.26852E9           /* BeiDou B3 frequency (Hz) */
+#define FREQ2_CMP   1.561098E9          /* BeiDou B1 frequency (Hz) */
+#define FREQ7_CMP   1.20714E9           /* BeiDou B2 frequency (Hz) */
+#define FREQ6_CMP   1.26852E9           /* BeiDou B3 frequency (Hz) */
 
 #define EFACT_GPS   1.0                 /* error factor: GPS */
 #define EFACT_GLO   1.5                 /* error factor: GLONASS */
@@ -99,8 +97,6 @@ extern "C" {
 #define SYS_GAL     0x08                /* navigation system: Galileo */
 #define SYS_QZS     0x10                /* navigation system: QZSS */
 #define SYS_CMP     0x20                /* navigation system: BeiDou */
-#define SYS_IRN     0x40                /* navigation system: IRNSS */
-#define SYS_LEO     0x80                /* navigation system: LEO */
 #define SYS_ALL     0xFF                /* navigation system: all */
 
 #define TSYS_GPS    0                   /* time system: GPS time */
@@ -137,7 +133,7 @@ extern "C" {
 #endif
 #ifdef ENAGAL
 #define MINPRNGAL   1                   /* min satellite PRN number of Galileo */
-#define MAXPRNGAL   30                  /* max satellite PRN number of Galileo */
+#define MAXPRNGAL   27                  /* max satellite PRN number of Galileo */
 #define NSATGAL    (MAXPRNGAL-MINPRNGAL+1) /* number of Galileo satellites */
 #define NSYSGAL     1
 #else
@@ -148,16 +144,14 @@ extern "C" {
 #endif
 #ifdef ENAQZS
 #define MINPRNQZS   193                 /* min satellite PRN number of QZSS */
-#define MAXPRNQZS   199                 /* max satellite PRN number of QZSS */
+#define MAXPRNQZS   195                 /* max satellite PRN number of QZSS */
 #define MINPRNQZS_S 183                 /* min satellite PRN number of QZSS SAIF */
-#define MAXPRNQZS_S 189                 /* max satellite PRN number of QZSS SAIF */
+#define MAXPRNQZS_S 185                 /* max satellite PRN number of QZSS SAIF */
 #define NSATQZS     (MAXPRNQZS-MINPRNQZS+1) /* number of QZSS satellites */
 #define NSYSQZS     1
 #else
 #define MINPRNQZS   0
 #define MAXPRNQZS   0
-#define MINPRNQZS_S 0
-#define MAXPRNQZS_S 0
 #define NSATQZS     0
 #define NSYSQZS     0
 #endif
@@ -172,24 +166,13 @@ extern "C" {
 #define NSATCMP     0
 #define NSYSCMP     0
 #endif
-#ifdef ENALEO
-#define MINPRNLEO   1                   /* min satellite sat number of LEO */
-#define MAXPRNLEO   10                  /* max satellite sat number of LEO */
-#define NSATLEO     (MAXPRNLEO-MINPRNLEO+1) /* number of LEO satellites */
-#define NSYSLEO     1
-#else
-#define MINPRNLEO   0
-#define MAXPRNLEO   0
-#define NSATLEO     0
-#define NSYSLEO     0
-#endif
-#define NSYS        (NSYSGPS+NSYSGLO+NSYSGAL+NSYSQZS+NSYSCMP+NSYSLEO) /* number of systems */
+#define NSYS        (NSYSGPS+NSYSGLO+NSYSGAL+NSYSQZS+NSYSCMP) /* number of systems */
 
 #define MINPRNSBS   120                 /* min satellite PRN number of SBAS */
 #define MAXPRNSBS   142                 /* max satellite PRN number of SBAS */
 #define NSATSBS     (MAXPRNSBS-MINPRNSBS+1) /* number of SBAS satellites */
 
-#define MAXSAT      (NSATGPS+NSATGLO+NSATGAL+NSATQZS+NSATCMP+NSATSBS+NSATLEO)
+#define MAXSAT      (NSATGPS+NSATGLO+NSATGAL+NSATQZS+NSATCMP+NSATSBS)
                                         /* max satellite number (1 to MAXSAT) */
 #ifndef MAXOBS
 #define MAXOBS      64                  /* max number of obs in an epoch */
@@ -197,19 +180,17 @@ extern "C" {
 #define MAXRCV      64                  /* max receiver number (1 to MAXRCV) */
 #define MAXOBSTYPE  64                  /* max number of obs type in RINEX */
 #define DTTOL       0.005               /* tolerance of time difference (s) */
-#define MAXDTOE     7200.0              /* max time difference to GPS Toe (s) */
-#define MAXDTOE_QZS 7200.0              /* max time difference to QZSS Toe (s) */
-#define MAXDTOE_GAL 10800.0             /* max time difference to Galileo Toe (s) */
-#define MAXDTOE_CMP 21600.0             /* max time difference to BeiDou Toe (s) */
+#if 0
+#define MAXDTOE     10800.0             /* max time difference to ephem Toe (s) for GPS */
+#else
+#define MAXDTOE     7200.0              /* max time difference to ephem Toe (s) for GPS */
+#endif
 #define MAXDTOE_GLO 1800.0              /* max time difference to GLONASS Toe (s) */
 #define MAXDTOE_SBS 360.0               /* max time difference to SBAS Toe (s) */
 #define MAXDTOE_S   86400.0             /* max time difference to ephem toe (s) for other */
 #define MAXGDOP     300.0               /* max GDOP */
 
-#define INT_SWAP_TRAC 86400.0           /* swap interval of trace file (s) */
-#define INT_SWAP_STAT 86400.0           /* swap interval of solution status file (s) */
-
-#define MAXEXFILE   1024                /* max number of expanded files */
+#define MAXEXFILE   100                 /* max number of expanded files */
 #define MAXSBSAGEF  30.0                /* max age of SBAS fast correction (s) */
 #define MAXSBSAGEL  1800.0              /* max age of SBAS long term corr (s) */
 #define MAXSBSURA   8                   /* max URA of SBAS satellite */
@@ -222,13 +203,12 @@ extern "C" {
 #define MAXSTRRTK   8                   /* max number of stream in RTK server */
 #define MAXSBSMSG   32                  /* max number of SBAS msg in RTK server */
 #define MAXSOLMSG   4096                /* max length of solution message */
-#define MAXRAWLEN   8192                /* max length of receiver raw message */
+#define MAXRAWLEN   4096                /* max length of receiver raw message */
 #define MAXERRMSG   4096                /* max length of error/warning message */
 #define MAXANT      64                  /* max length of station name/antenna type */
 #define MAXSOLBUF   256                 /* max number of solution buffer */
 #define MAXOBSBUF   128                 /* max number of observation data buffer */
 #define MAXNRPOS    16                  /* max number of reference positions */
-#define MAXLEAPS    64                  /* max number of leap seconds table */
 
 #define RNX2VER     2.10                /* RINEX ver.2 default output version */
 #define RNX3VER     3.00                /* RINEX ver.3 default output version */
@@ -294,9 +274,7 @@ extern "C" {
 #define CODE_L3I    44                  /* obs code: G3I        (GLO) */
 #define CODE_L3Q    45                  /* obs code: G3Q        (GLO) */
 #define CODE_L3X    46                  /* obs code: G3I+Q      (GLO) */
-#define CODE_L1I    47                  /* obs code: B1I        (BDS) */
-#define CODE_L1Q    48                  /* obs code: B1Q        (BDS) */
-#define MAXCODE     48                  /* max number of obs code */
+#define MAXCODE     46                  /* max number of obs code */
 
 #define PMODE_SINGLE 0                  /* positioning mode: single */
 #define PMODE_DGPS   1                  /* positioning mode: DGPS/DGNSS */
@@ -390,18 +368,17 @@ extern "C" {
 #define STRFMT_JAVAD 9                  /* stream format: JAVAD GRIL/GREIS */
 #define STRFMT_NVS   10                 /* stream format: NVS NVC08C */
 #define STRFMT_BINEX 11                 /* stream format: BINEX */
-#define STRFMT_RT17  12                 /* stream format: Trimble RT17 */
-#define STRFMT_LEXR  13                 /* stream format: Furuno LPY-10000 */
-#define STRFMT_SEPT  14                 /* stream format: Septentrio */
-#define STRFMT_RINEX 15                 /* stream format: RINEX */
-#define STRFMT_SP3   16                 /* stream format: SP3 */
-#define STRFMT_RNXCLK 17                /* stream format: RINEX CLK */
-#define STRFMT_SBAS  18                 /* stream format: SBAS messages */
-#define STRFMT_NMEA  19                 /* stream format: NMEA 0183 */
+#define STRFMT_LEXR  12                 /* stream format: Furuno LPY-10000 */
+#define STRFMT_SIRF  13                 /* stream format: SiRF    (reserved) */
+#define STRFMT_RINEX 14                 /* stream format: RINEX */
+#define STRFMT_SP3   15                 /* stream format: SP3 */
+#define STRFMT_RNXCLK 16                /* stream format: RINEX CLK */
+#define STRFMT_SBAS  17                 /* stream format: SBAS messages */
+#define STRFMT_NMEA  18                 /* stream format: NMEA 0183 */
 #ifndef EXTLEX
-#define MAXRCVFMT    12                 /* max number of receiver format */
+#define MAXRCVFMT    11                 /* max number of receiver format */
 #else
-#define MAXRCVFMT    13
+#define MAXRCVFMT    12
 #endif
 
 #define STR_MODE_R  0x1                 /* stream mode: read */
@@ -413,7 +390,6 @@ extern "C" {
 #define GEOID_EGM2008_M25 2             /* geoid model: EGM2008 2.5x2.5" */
 #define GEOID_EGM2008_M10 3             /* geoid model: EGM2008 1.0x1.0" */
 #define GEOID_GSI2000_M15 4             /* geoid model: GSI geoid 2000 1.0x1.5" */
-#define GEOID_RAF09       5             /* geoid model: IGN RAF09 for France 1.5"x2" */
 
 #define COMMENTH    "%"                 /* comment line indicator for solution */
 #define MSG_DISCONN "$_DISCONNECT\r\n"  /* disconnect message */
@@ -422,12 +398,6 @@ extern "C" {
 #define DLOPT_KEEPCMP 0x02              /* download option: keep compressed file */
 #define DLOPT_HOLDERR 0x04              /* download option: hold on error file */
 #define DLOPT_HOLDLST 0x08              /* download option: hold on listing file */
-
-#define LLI_SLIP    0x01                /* LLI: cycle-slip */
-#define LLI_HALFC   0x02                /* LLI: half-cycle not resovled */
-#define LLI_BOCTRK  0x04                /* LLI: boc tracking of mboc signal */
-#define LLI_HALFA   0x40                /* LLI: half-cycle added */
-#define LLI_HALFS   0x80                /* LLI: half-cycle subtracted */
 
 #define P2_5        0.03125             /* 2^-5 */
 #define P2_6        0.015625            /* 2^-6 */
@@ -552,7 +522,6 @@ typedef struct {        /* GPS/QZS/GAL broadcast ephemeris type */
                         /* GPS/QZS:tgd[0]=TGD */
                         /* GAL    :tgd[0]=BGD E5a/E1,tgd[1]=BGD E5b/E1 */
                         /* CMP    :tgd[0]=BGD1,tgd[1]=BGD2 */
-    double Adot,ndot;   /* Adot,ndot for CNAV */
 } eph_t;
 
 typedef struct {        /* GLONASS broadcast ephemeris type */
@@ -574,10 +543,6 @@ typedef struct {        /* precise ephemeris type */
     int index;          /* ephemeris index for multiple files */
     double pos[MAXSAT][4]; /* satellite position/clock (ecef) (m|s) */
     float  std[MAXSAT][4]; /* satellite position/clock std (m|s) */
-    double vel[MAXSAT][4]; /* satellite velocity/clk-rate (m/s|s/s) */
-    float  vst[MAXSAT][4]; /* satellite velocity/clk-rate std (m/s|s/s) */
-    float  cov[MAXSAT][3]; /* satellite position covariance (m^2) */
-    float  vco[MAXSAT][3]; /* satellite velocity covariance (m^2) */
 } peph_t;
 
 typedef struct {        /* precise clock type */
@@ -739,7 +704,6 @@ typedef struct {        /* SSR correction type */
     double udi[5];      /* SSR update interval (s) */
     int iod[5];         /* iod ssr {eph,clk,hrclk,ura,bias} */
     int iode;           /* issue of data */
-    int iodcrc;         /* issue of data crc for beidou/sbas */
     int ura;            /* URA indicator */
     int refd;           /* sat ref datum (0:ITRF,1:regional) */
     double deph [3];    /* delta orbit {radial,along,cross} (m) */
@@ -910,8 +874,8 @@ typedef struct {        /* RTCM control struct type */
     int obsflag;        /* obs data complete flag (1:ok,0:not complete) */
     int ephsat;         /* update satellite of ephemeris */
     double cp[MAXSAT][NFREQ+NEXOBS]; /* carrier-phase measurement */
-    unsigned short lock[MAXSAT][NFREQ+NEXOBS]; /* lock time */
-    unsigned short loss[MAXSAT][NFREQ+NEXOBS]; /* loss of lock count */
+    unsigned char lock[MAXSAT][NFREQ+NEXOBS]; /* lock time */
+    unsigned char loss[MAXSAT][NFREQ+NEXOBS]; /* loss of lock count */
     gtime_t lltime[MAXSAT][NFREQ+NEXOBS]; /* last lock time */
     int nbyte;          /* number of bytes in message buffer */ 
     int nbit;           /* number of bits in word buffer */ 
@@ -974,7 +938,6 @@ typedef struct {        /* processing options type */
     int sateph;         /* satellite ephemeris/clock (EPHOPT_???) */
     int modear;         /* AR mode (0:off,1:continuous,2:instantaneous,3:fix and hold,4:ppp-ar) */
     int glomodear;      /* GLONASS AR mode (0:off,1:on,2:auto cal,3:ext cal) */
-    int bdsmodear;      /* BeiDou AR mode (0:off,1:on) */
     int maxout;         /* obs outage count to reset bias */
     int minlock;        /* min lock count to fix ambiguity */
     int minfix;         /* min fix count to hold ambiguity */
@@ -1137,7 +1100,7 @@ typedef struct {        /* RTK control/result type */
 
 typedef struct {        /* receiver raw data control type */
     gtime_t time;       /* message time */
-    gtime_t tobs[MAXSAT][NFREQ+NEXOBS]; /* observation data time */
+    gtime_t tobs;       /* observation data time */
     obs_t obs;          /* observation data */
     obs_t obuf;         /* observation data buffer */
     nav_t nav;          /* satellite ephemerides */
@@ -1145,7 +1108,7 @@ typedef struct {        /* receiver raw data control type */
     int ephsat;         /* sat number of update ephemeris (0:no satellite) */
     sbsmsg_t sbsmsg;    /* SBAS message */
     char msgtype[256];  /* last message type */
-    unsigned char subfrm[MAXSAT][380];  /* subframe buffer */
+    unsigned char subfrm[MAXSAT][150];  /* subframe buffer (1-5) */
     lexmsg_t lexmsg;    /* LEX message */
     double lockt[MAXSAT][NFREQ+NEXOBS]; /* lock time (s) */
     double icpp[MAXSAT],off[MAXSAT],icpc; /* carrier params for ss2 */
@@ -1161,13 +1124,6 @@ typedef struct {        /* receiver raw data control type */
     int outtype;        /* output message type */
     unsigned char buff[MAXRAWLEN]; /* message buffer */
     char opt[256];      /* receiver dependent options */
-    double receive_time;/* RT17: Reiceve time of week for week rollover detection */
-    unsigned int plen;  /* RT17: Total size of packet to be read */
-    unsigned int pbyte; /* RT17: How many packet bytes have been read so far */
-    unsigned int page;  /* RT17: Last page number */
-    unsigned int reply; /* RT17: Current reply number */
-    int week;           /* RT17: week number */
-    unsigned char pbuff[255+4+2]; /* RT17: Packet buffer */
 } raw_t;
 
 typedef struct {        /* stream type */
@@ -1322,7 +1278,6 @@ extern gtime_t timeget  (void);
 extern void    timeset  (gtime_t t);
 extern double  time2doy (gtime_t t);
 extern double  utc2gmst (gtime_t t, double ut1_utc);
-extern int read_leaps(const char *file);
 
 extern int adjgpsweek(int week);
 extern unsigned int tickget(void);
@@ -1474,7 +1429,7 @@ extern void seph2pos(gtime_t time, const seph_t *seph, double *rs, double *dts,
                      double *var);
 extern int  peph2pos(gtime_t time, int sat, const nav_t *nav, int opt,
                      double *rs, double *dts, double *var);
-extern void satantoff(gtime_t time, const double *rs, int sat, const nav_t *nav,
+extern void satantoff(gtime_t time, const double *rs, const pcv_t *pcv,
                       double *dant);
 extern int  satpos(gtime_t time, gtime_t teph, int sat, int ephopt,
                    const nav_t *nav, double *rs, double *dts, double *var,
@@ -1497,17 +1452,12 @@ extern unsigned int getbitu(const unsigned char *buff, int pos, int len);
 extern int          getbits(const unsigned char *buff, int pos, int len);
 extern void setbitu(unsigned char *buff, int pos, int len, unsigned int data);
 extern void setbits(unsigned char *buff, int pos, int len, int data);
-extern unsigned int rtk_crc32  (const unsigned char *buff, int len);
-extern unsigned int rtk_crc24q (const unsigned char *buff, int len);
-extern unsigned short rtk_crc16(const unsigned char *buff, int len);
+extern unsigned int crc32  (const unsigned char *buff, int len);
+extern unsigned int crc24q (const unsigned char *buff, int len);
+extern unsigned short crc16(const unsigned char *buff, int len);
 extern int decode_word (unsigned int word, unsigned char *data);
 extern int decode_frame(const unsigned char *buff, eph_t *eph, alm_t *alm,
                         double *ion, double *utc, int *leaps);
-extern int test_glostr(const unsigned char *buff);
-extern int decode_glostr(const unsigned char *buff, geph_t *geph);
-extern int decode_bds_d1(const unsigned char *buff, eph_t *eph);
-extern int decode_bds_d2(const unsigned char *buff, eph_t *eph);
-extern int decode_gal_inav(const unsigned char *buff, eph_t *eph);
 
 extern int init_raw   (raw_t *raw);
 extern void free_raw  (raw_t *raw);
@@ -1524,7 +1474,6 @@ extern int input_gw10  (raw_t *raw, unsigned char data);
 extern int input_javad (raw_t *raw, unsigned char data);
 extern int input_nvs   (raw_t *raw, unsigned char data);
 extern int input_bnx   (raw_t *raw, unsigned char data);
-extern int input_rt17  (raw_t *raw, unsigned char data);
 extern int input_lexr  (raw_t *raw, unsigned char data);
 extern int input_oem4f (raw_t *raw, FILE *fp);
 extern int input_oem3f (raw_t *raw, FILE *fp);
@@ -1536,7 +1485,6 @@ extern int input_gw10f (raw_t *raw, FILE *fp);
 extern int input_javadf(raw_t *raw, FILE *fp);
 extern int input_nvsf  (raw_t *raw, FILE *fp);
 extern int input_bnxf  (raw_t *raw, FILE *fp);
-extern int input_rt17f (raw_t *raw, FILE *fp);
 extern int input_lexrf (raw_t *raw, FILE *fp);
 
 extern int gen_ubx (const char *msg, unsigned char *buff);

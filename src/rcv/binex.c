@@ -1,7 +1,7 @@
 /*------------------------------------------------------------------------------
 * binex.c : binex dependent functions
 *
-*          Copyright (C) 2013-2018 by T.TAKASU, All rights reserved.
+*          Copyright (C) 2013 by T.TAKASU, All rights reserved.
 *
 * reference :
 *     [1] UNAVCO, BINEX: Binary exchange format
@@ -10,15 +10,10 @@
 * version : $Revision:$ $Date:$
 * history : 2013/02/20 1.0 new
 *           2013/04/15 1.1 support 0x01-05 beidou-2/compass ephemeris
-*           2013/05/18 1.2 fix bug on decoding obsflags in message 0x7f-05
-*           2014/04/27 1.3 fix bug on decoding iode for message 0x01-02
-*           2015/12/05 1.4 fix bug on decoding tgd for message 0x01-05
-*           2016/07/29 1.5 crc16() -> rtk_crc16()
-*           2017/04/11 1.6 (char *) -> (signed char *)
-*                          fix bug on unchange-test of beidou ephemeris
-*           2017/11/28 1.7 fix bug on decoding galileo ephemeris (0x01-04)
 *-----------------------------------------------------------------------------*/
 #include "rtklib.h"
+
+static const char rcsid[]="$Id:$";
 
 #define BNXSYNC1    0xC2    /* binex sync (little-endian,regular-crc) */
 #define BNXSYNC2    0xE2    /* binex sync (big-endian   ,regular-crc) */
@@ -39,7 +34,7 @@ static const double ura_eph[]={
 };
 /* get fields (big-endian) ---------------------------------------------------*/
 #define U1(p) (*((unsigned char *)(p)))
-#define I1(p) (*((signed char *)(p)))
+#define I1(p) (*((char *)(p)))
 
 static unsigned short U2(unsigned char *p)
 {
@@ -518,7 +513,7 @@ static int decode_bnx_01_02(raw_t *raw, unsigned char *buff, int len)
     if (raw->time.time==0) return 0;
     geph.toe=utc2gpst(adjday(raw->time,tod-10800.0));
     geph.tof=utc2gpst(adjday(raw->time,tof-10800.0));
-    geph.iode=(int)(fmod(tod,86400.0)/900.0+0.5);
+    geph.iode=(int)(fmod(tod+10800.0,86400.0)/900.0+0.5);
     
     if (!strstr(raw->opt,"-EPHALL")) {
         if (fabs(timediff(geph.toe,raw->nav.geph[prn-MINPRNGLO].toe))<1.0&&
@@ -589,7 +584,7 @@ static int decode_bnx_01_04(raw_t *raw, unsigned char *buff, int len)
     
     if (len>=127) {
         prn       =U1(p)+1;      p+=1;
-        eph.week  =U2(p);        p+=2; /* gal-week = gps-week */
+        eph.week  =U2(p);        p+=2;
         tow       =I4(p);        p+=4;
         eph.toes  =I4(p);        p+=4;
         eph.tgd[0]=R4(p);        p+=4; /* BGD E5a/E1 */
@@ -626,7 +621,7 @@ static int decode_bnx_01_04(raw_t *raw, unsigned char *buff, int len)
         return -1;
     }
     eph.A=sqrtA*sqrtA;
-    eph.iodc=eph.iode;
+    eph.iode=eph.iodc;
     eph.toe=gpst2time(eph.week,eph.toes);
     eph.toc=gpst2time(eph.week,eph.toes);
     eph.ttr=adjweek(eph.toe,tow);
@@ -644,7 +639,7 @@ static int decode_bnx_01_04(raw_t *raw, unsigned char *buff, int len)
 static double bds_tgd(int tgd)
 {
     tgd&=0x3FF;
-    return (tgd&0x200)?-1E-10*((~tgd)&0x1FF):1E-10*(tgd&0x1FF);
+    return (tgd&0x200)?-1E10*((~tgd)&0x1FF):1E-10*(tgd&0x1FF);
 }
 /* decode binex mesaage 0x01-05: decoded beidou-2/compass ephmemeris ---------*/
 static int decode_bnx_01_05(raw_t *raw, unsigned char *buff, int len)
@@ -706,8 +701,7 @@ static int decode_bnx_01_05(raw_t *raw, unsigned char *buff, int len)
         /* message source (0:unknown,1:B1I,2:B1Q,3:B2I,4:B2Q,5:B3I,6:B3Q)*/
     
     if (!strstr(raw->opt,"-EPHALL")) {
-        if (timediff(raw->nav.eph[eph.sat-1].toe,eph.toe)==0.0&&
-            raw->nav.eph[eph.sat-1].iode==eph.iode&&
+        if (raw->nav.eph[eph.sat-1].iode==eph.iode&&
             raw->nav.eph[eph.sat-1].iodc==eph.iodc) return 0; /* unchanged */
     }
     raw->nav.eph[eph.sat-1]=eph;
@@ -881,7 +875,7 @@ static unsigned char *decode_bnx_7f_05_obs(raw_t *raw, unsigned char *buff,
         CODE_L5X ,CODE_L5I ,CODE_L5Q ,CODE_L5X                       /*  6- 9 */
     };
     const unsigned char codes_cmp[32]={
-        CODE_L1X ,CODE_L1I ,CODE_L1Q ,CODE_L1X ,CODE_L7X ,CODE_L7I , /*  0- 5 */
+        CODE_L2X ,CODE_L2I ,CODE_L2Q ,CODE_L2X ,CODE_L7X ,CODE_L7I , /*  0- 5 */
         CODE_L7Q ,CODE_L7X ,CODE_L6X ,CODE_L6I ,CODE_L6Q ,CODE_L6X , /*  6-11 */
         CODE_L1X ,CODE_L1S ,CODE_L1L ,CODE_L1X                       /* 12-15 */
     };
@@ -896,7 +890,7 @@ static unsigned char *decode_bnx_7f_05_obs(raw_t *raw, unsigned char *buff,
     const unsigned char *codes=NULL;
     double range[8],phase[8],cnr[8],dopp[8]={0},acc,wl;
     unsigned char *p=buff;
-    unsigned char flag,flags[4];
+    unsigned char flag,flag0,flag1,flag2,flag3;
     int i,j,k,sys,fcn=-10,code[8],slip[8],pri[8],freq[8],slipcnt[8]={0},mask[8]={0};
     
     trace(5,"decode_bnx_7f_05_obs: sat=%2d nobs=%2d\n",sat,nobs);
@@ -917,17 +911,15 @@ static unsigned char *decode_bnx_7f_05_obs(raw_t *raw, unsigned char *buff,
         slip[i]=getbitu(p,2,1);
         code[i]=getbitu(p,3,5); p++;
         
-        for (j=0;j<4;j++) flags[j]=0;
+        flag0=flag1=flag2=flag3=0;
         
-        for (j=0;flag&&j<4;j++) {
-            flag=U1(p++);
-            flags[flag&0x03]=flag&0x7F;
-            flag&=0x80;
-        }
-        if (flags[2]) {
-            fcn=getbits(flags+2,2,4);
-        }
-        acc=(flags[0]&0x20)?0.0001:0.00002; /* phase accuracy */
+        if (flag)       flag0=U1(p++);
+        if (flag0&0x80) flag1=U1(p++);
+        if (flag1&0x80) flag2=U1(p++);
+        if (flag2&0x80) flag3=U1(p++);
+        if (flag1&0x80) fcn=getbits(&flag2,2,4);
+        
+        acc=(flag0&0x20)?0.0001:0.00002; /* phase accuracy */
         
         cnr[i]=U1(p++)*0.4;
         
@@ -935,33 +927,31 @@ static unsigned char *decode_bnx_7f_05_obs(raw_t *raw, unsigned char *buff,
             cnr[i]+=getbits(p,0,2)*0.1;
             range[i]=getbitu(p,2,32)*0.064+getbitu(p,34,6)*0.001; p+=5;
         }
-        else if (flags[0]&0x40) {
+        else if (flag0&0x40) {
             cnr[i]+=getbits(p,0,2)*0.1;
             range[i]=range[0]+getbits(p,4,20)*0.001; p+=3;
         }
         else {
             range[i]=range[0]+getbits(p,0,16)*0.001; p+=2;
         }
-        if (flags[0]&0x40) {
+        if (flag0&0x40) {
             phase[i]=range[i]+getbits(p,0,24)*acc; p+=3;
         }
         else {
             cnr[i]+=getbits(p,0,2)*0.1;
             phase[i]=range[i]+getbits(p,2,22)*acc; p+=3;
         }
-        if (flags[0]&0x04) {
+        if (flag0&0x04) {
             dopp[i]=getbits(p,0,24)/256.0; p+=3;
         }
-        if (flags[0]&0x08) {
-            if (flags[0]&0x10) {
-                slipcnt[i]=U2(p); p+=2;
-            }
-            else {
-                slipcnt[i]=U1(p); p+=1;
-            }
+        if (flag0&0x18) {
+            slipcnt[i]=U2(p); p+=2;
+        }
+        else if (flag0&0x08) {
+            slipcnt[i]=U1(p); p+=1;
         }
         trace(5,"(%d) CODE=%2d S=%d F=%02X %02X %02X %02X\n",i+1,
-              code[i],slip[i],flags[0],flags[1],flags[2],flags[3]);
+              code[i],slip,flag0,flag1,flag2,flag3);
         trace(5,"(%d) P=%13.3f L=%13.3f D=%7.1f SNR=%4.1f SCNT=%2d\n",
               i+1,range[i],phase[i],dopp[i],cnr[i],slipcnt[i]);
     }
@@ -976,12 +966,6 @@ static unsigned char *decode_bnx_7f_05_obs(raw_t *raw, unsigned char *buff,
     for (i=0;i<nobs;i++) {
         code2obs(codes[code[i]&0x3F],freq+i);
         pri[i]=getcodepri(sys,codes[code[i]&0x3F],raw->opt);
-        
-        /* frequency index for beidou */
-        if (sys==SYS_CMP) {
-            if      (freq[i]==5) freq[i]=2; /* B2 */
-            else if (freq[i]==4) freq[i]=3; /* B3 */
-        }
     }
     for (i=0;i<NFREQ;i++) {
         for (j=0,k=-1;j<nobs;j++) {
@@ -1080,7 +1064,7 @@ static int decode_bnx_7f_05(raw_t *raw, unsigned char *buff, int len)
             default: sat=0; break;
         }
         /* decode binex mesaage 0x7F-05 obs data */
-        if (!(p=decode_bnx_7f_05_obs(raw,p,sat,nobs,&data))) return -1;
+        p=decode_bnx_7f_05_obs(raw,p,sat,nobs,&data);
         
         if ((int)(p-buff)>len) {
             trace(2,"binex 0x7F-05 length error: nsat=%2d len=%d\n",nsat,len);
@@ -1144,7 +1128,7 @@ static int decode_bnx(raw_t *raw)
     }
     else {
         cs1=U2(raw->buff+raw->len);
-        cs2=rtk_crc16(raw->buff+1,raw->len-1);
+        cs2=crc16(raw->buff+1,raw->len-1);
     }
     if (cs1!=cs2) {
         trace(2,"binex 0x%02X parity error CS=%X %X\n",rec,cs1,cs2);

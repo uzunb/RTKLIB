@@ -48,9 +48,9 @@ object TcpOptDialog: TTcpOptDialog
   object LabelMntPnt: TLabel
     Left = 8
     Top = 42
-    Width = 54
+    Width = 52
     Height = 13
-    Caption = 'Mountpoint'
+    Caption = 'Mountpont'
   end
   object LabelStr: TLabel
     Left = 8

@@ -6,25 +6,25 @@ SRC     = ../../../src
 OPTS    = -DTRACE -DENAGLO -DENAQZS -DENAGAL -DNFREQ=3
 
 # for no lapack
-CFLAGS  = -Wall -O3 -ansi -pedantic -Wno-unused-but-set-variable -I$(SRC) $(OPTS) -g
-LDLIBS  = -lm -lrt
+#CFLAGS  = -Wall -O3 -ansi -pedantic -I$(SRC) $(OPTS)
+#LDLIBS  = -lm -lrt
 
-#CFLAGS  = -Wall -O3 -ansi -pedantic -Wno-unused-but-set-variable -I$(SRC) -DLAPACK $(OPTS)
-#LDLIBS  = -lm -lrt -llapack -lblas
+CFLAGS  = -Wall -O3 -ansi -pedantic -I$(SRC) -DLAPACK $(OPTS)
+LDLIBS  = -lm -lrt -llapack -lblas
 
 # for gprof
-#CFLAGS  = -Wall -O3 -ansi -pedantic -Wno-unused-but-set-variable -I$(SRC) -DLAPACK $(OPTS) -pg
+#CFLAGS  = -Wall -O3 -ansi -pedantic -I$(SRC) -DLAPACK $(OPTS) -pg
 #LDLIBS  = -lm -lrt -llapack -lblas -pg
 
 # for mkl
-#MKLDIR  = /opt/intel/mkl
-#CFLAGS  = -O3 -ansi -pedantic -Wno-unused-but-set-variable -I$(SRC) $(OPTS) -DMKL
-#LDLIBS  = -L$(MKLDIR)/lib/intel64 -lm -lrt -lmkl_core -lmkl_intel_lp64 -lmkl_gnu_thread -liomp5 -lpthread
+#MKLDIR  = /opt/intel
+#CFLAGS  = -O3 -ansi -pedantic -I$(SRC) $(OPTS) -DMKL -I$(MKLDIR)/include
+#LDLIBS  = -L$(MKLDIR)/lib/32 -lm -lmkl_core -lmkl_intel -lmkl_gnu_thread -liomp5 -lpthread
 
 all        : rnx2rtkp
 rnx2rtkp   : rnx2rtkp.o rtkcmn.o rinex.o rtkpos.o postpos.o solution.o
 rnx2rtkp   : lambda.o geoid.o sbas.o preceph.o pntpos.o ephemeris.o options.o
-rnx2rtkp   : ppp.o ppp_ar.o rtcm.o rtcm2.o rtcm3.o rtcm3e.o ionex.o qzslex.o
+rnx2rtkp   : ppp.o ppp_ar.o rtcm.o rtcm2.o rtcm3.o rtcm3e.o ionex.o stec.o rtkpos_gsi.o
 
 rnx2rtkp.o : ../rnx2rtkp.c
 	$(CC) -c $(CFLAGS) ../rnx2rtkp.c
@@ -66,8 +66,10 @@ rtcm3e.o   : $(SRC)/rtcm3e.c
 	$(CC) -c $(CFLAGS) $(SRC)/rtcm3e.c
 ionex.o    : $(SRC)/ionex.c
 	$(CC) -c $(CFLAGS) $(SRC)/ionex.c
-qzslex.o   : $(SRC)/qzslex.c
-	$(CC) -c $(CFLAGS) $(SRC)/qzslex.c
+stec.o     : $(SRC)/stec.c
+	$(CC) -c $(CFLAGS) $(SRC)/stec.c
+rtkpos_gsi.o: $(SRC)/rtkpos_gsi.c
+	$(CC) -c $(CFLAGS) $(SRC)/rtkpos_gsi.c
 
 rnx2rtkp.o : $(SRC)/rtklib.h
 rtkcmn.o   : $(SRC)/rtklib.h
@@ -89,7 +91,8 @@ rtcm2.o    : $(SRC)/rtklib.h
 rtcm3.o    : $(SRC)/rtklib.h
 rtcm3e.o   : $(SRC)/rtklib.h
 ionex.o    : $(SRC)/rtklib.h
-qzslex.o   : $(SRC)/rtklib.h
+stec.o     : $(SRC)/rtklib.h
+rtkpos_gsi.o: $(SRC)/rtklib.h
 
 CMD1    = ./rnx2rtkp
 INPUT11 = ../../../test/data/rinex/07590920.05o ../../../test/data/rinex/30400920.05n

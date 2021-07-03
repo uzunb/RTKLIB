@@ -1,7 +1,7 @@
 /*------------------------------------------------------------------------------
 * rcvlex.c : qzss lex receiver dependent functions
 *
-*          Copyright (C) 2011-2018 by T.TAKASU, All rights reserved.
+*          Copyright (C) 2011 by T.TAKASU, All rights reserved.
 *
 * reference :
 *     [1] LEX signal receiver (LPY-10000) protocol specification, Furuno Denki,
@@ -11,13 +11,8 @@
 *
 * version : $Revision:$ $Date:$
 * history : 2011/05/27 1.0 new
-*           2013/06/02 1.1 fix bug on unable compile
-*           2014/10/26 1.2 suppress warning on type-punning pointer
-*           2017/04/11 1.3 (char *) -> (signed char *)
 *-----------------------------------------------------------------------------*/
 #include "rtklib.h"
-
-#ifdef EXTLEX /* lex extention */
 
 #define LEXFRMPREAMB 0x1ACFFC1Du /* lex message frame preamble */
 
@@ -29,28 +24,36 @@
 #define ID_LEXRAW   0x0002      /* lex receiver message id: raw measurement */
 #define ID_LEXMSG   0x0015      /* lex receiver message id: lex message */
 
+static const char rcsid[]="$Id:$";
+
 /* extract field (big-endian) ------------------------------------------------*/
 #define U1(p)       (*((unsigned char *)(p)))
-#define I1(p)       (*((signed char *)(p)))
+#define I1(p)       (*((char *)(p)))
 
 static unsigned short U2(unsigned char *p)
 {
-    union {unsigned short u2; unsigned char b[2];} buff;
-    buff.b[0]=p[1]; buff.b[1]=p[0];
-    return buff.u2;
+    unsigned char b[2];
+    b[0]=p[1]; b[1]=p[0];
+    return *(unsigned short *)b;
 }
 static unsigned int U4(unsigned char *p)
 {
-    union {unsigned int u4; unsigned char b[4];} buff;
-    buff.b[0]=p[3]; buff.b[1]=p[2]; buff.b[2]=p[1]; buff.b[3]=p[0];
-    return buff.u4;
+    unsigned char b[4];
+    b[0]=p[3]; b[1]=p[2]; b[2]=p[1]; b[3]=p[0];
+    return *(unsigned int *)b;
+}
+static float R4(unsigned char *p)
+{
+    unsigned char b[4];
+    b[0]=p[3]; b[1]=p[2]; b[2]=p[1]; b[3]=p[0];
+    return *(float *)b;
 }
 static double R8(unsigned char *p)
 {
-    union {double r8; unsigned char b[8];} buff;
-    buff.b[0]=p[7]; buff.b[1]=p[6]; buff.b[2]=p[5]; buff.b[3]=p[4];
-    buff.b[4]=p[3]; buff.b[5]=p[2]; buff.b[6]=p[1]; buff.b[7]=p[0];
-    return buff.r8;
+    unsigned char b[8];
+    b[0]=p[7]; b[1]=p[6]; b[2]=p[5]; b[3]=p[4];
+    b[4]=p[3]; b[5]=p[2]; b[6]=p[1]; b[7]=p[0];
+    return *(double *)b;
 }
 /* crc-32 parity (ref [2] 15) ------------------------------------------------*/
 static unsigned int crc32r(const unsigned char *buff, int len)
@@ -236,7 +239,7 @@ static int decode_lexr(raw_t *raw)
     if (raw->outtype) {
         sprintf(raw->msgtype,"LEXR 0x%04X (%4d): stat=%08X week=%d tow=%10.3f",
                 type,raw->len,stat,week,tow/1000.0);
-    }
+    
     switch (type) {
         case ID_LEXRAW: return decode_lexraw(raw);
         case ID_LEXMSG: return decode_lexmsg(raw);
@@ -416,4 +419,3 @@ extern int gen_lexr(const char *msg, unsigned char *buff)
     trace(5,"gen_lexr: buff=\n"); traceb(5,buff,len);
     return len;
 }
-#endif /* EXTLEX */

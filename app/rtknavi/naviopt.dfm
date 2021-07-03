@@ -313,7 +313,6 @@ object OptDialog: TOptDialog
         Height = 19
         Caption = 'BeiDou'
         TabOrder = 14
-        OnClick = NavSys6Click
       end
       object ElMask: TComboBox
         Left = 221
@@ -394,12 +393,16 @@ object OptDialog: TOptDialog
     object TabSheet2: TTabSheet
       Caption = 'Setting&2'
       ImageIndex = 1
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object Label25: TLabel
         Left = 24
         Top = 7
-        Width = 184
+        Width = 161
         Height = 13
-        Caption = 'Integer Ambiguity Res (GPS/GLO/BDS)'
+        Caption = 'Integer Ambiguity Res (GPS/GLO)'
       end
       object Label24: TLabel
         Left = 24
@@ -460,7 +463,7 @@ object OptDialog: TOptDialog
       object AmbRes: TComboBox
         Left = 221
         Top = 4
-        Width = 47
+        Width = 69
         Height = 21
         Style = csDropDownList
         ItemIndex = 0
@@ -538,9 +541,9 @@ object OptDialog: TOptDialog
         Text = '1'
       end
       object GloAmbRes: TComboBox
-        Left = 269
+        Left = 291
         Top = 4
-        Width = 45
+        Width = 68
         Height = 21
         Style = csDropDownList
         ItemIndex = 0
@@ -631,24 +634,14 @@ object OptDialog: TOptDialog
           'OFF'
           'ON')
       end
-      object BdsAmbRes: TComboBox
-        Left = 315
-        Top = 4
-        Width = 45
-        Height = 21
-        Style = csDropDownList
-        ItemIndex = 0
-        TabOrder = 19
-        Text = 'OFF'
-        OnChange = AmbResChange
-        Items.Strings = (
-          'OFF'
-          'ON')
-      end
     end
     object TabSheet3: TTabSheet
       Caption = 'O&utput'
       ImageIndex = 2
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object LabelSolFormat: TLabel
         Left = 24
         Top = 7
@@ -1097,6 +1090,10 @@ object OptDialog: TOptDialog
     object TabSheet5: TTabSheet
       Caption = '&Positions'
       ImageIndex = 4
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object Label4: TLabel
         Left = 12
         Top = 12
@@ -1726,6 +1723,10 @@ object OptDialog: TOptDialog
     object TabSheet8: TTabSheet
       Caption = '&Misc'
       ImageIndex = 6
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object Label19: TLabel
         Left = 32
         Top = 7
@@ -1734,11 +1735,11 @@ object OptDialog: TOptDialog
         Caption = 'Process Cycle (ms) / Buffer Size (bytes)'
       end
       object Label40: TLabel
-        Left = 147
+        Left = 32
         Top = 167
-        Width = 39
+        Width = 63
         Height = 13
-        Caption = 'Sol Font'
+        Caption = 'Solution Font'
       end
       object FontLabel: TLabel
         Left = 280
@@ -1791,7 +1792,7 @@ object OptDialog: TOptDialog
       end
       object Label45: TLabel
         Left = 32
-        Top = 142
+        Top = 140
         Width = 96
         Height = 13
         Caption = 'HTTP / NTRIP Proxy'
@@ -1809,13 +1810,6 @@ object OptDialog: TOptDialog
         Width = 32
         Height = 13
         Caption = 'Sat No'
-      end
-      object Label43: TLabel
-        Left = 32
-        Top = 167
-        Width = 33
-        Height = 13
-        Caption = 'Layout'
       end
       object SvrCycleE: TEdit
         Left = 231
@@ -1845,7 +1839,7 @@ object OptDialog: TOptDialog
         Font.Name = 'Tahoma'
         Font.Style = []
         ParentFont = False
-        TabOrder = 13
+        TabOrder = 10
         OnClick = BtnFontClick
       end
       object SolBuffSizeE: TEdit
@@ -1916,7 +1910,7 @@ object OptDialog: TOptDialog
         Top = 115
         Width = 61
         Height = 21
-        TabOrder = 10
+        TabOrder = 11
         Text = '0'
       end
       object FileSwapMarginE: TEdit
@@ -1932,14 +1926,14 @@ object OptDialog: TOptDialog
         Top = 138
         Width = 214
         Height = 21
-        TabOrder = 11
+        TabOrder = 12
       end
       object TLEFile: TEdit
         Left = 55
         Top = 187
         Width = 298
         Height = 21
-        TabOrder = 14
+        TabOrder = 13
       end
       object BtnTLEFile: TButton
         Left = 354
@@ -1953,7 +1947,7 @@ object OptDialog: TOptDialog
         Font.Name = 'Tahoma'
         Font.Style = []
         ParentFont = False
-        TabOrder = 15
+        TabOrder = 14
         OnClick = BtnTLEFileClick
       end
       object TLESatFile: TEdit
@@ -1961,7 +1955,7 @@ object OptDialog: TOptDialog
         Top = 209
         Width = 298
         Height = 21
-        TabOrder = 16
+        TabOrder = 15
       end
       object BtnTLESatFile: TButton
         Left = 354
@@ -1975,21 +1969,8 @@ object OptDialog: TOptDialog
         Font.Name = 'Tahoma'
         Font.Style = []
         ParentFont = False
-        TabOrder = 17
+        TabOrder = 16
         OnClick = BtnTLESatFileClick
-      end
-      object PanelStackE: TComboBox
-        Left = 70
-        Top = 163
-        Width = 71
-        Height = 21
-        Style = csDropDownList
-        ItemIndex = 0
-        TabOrder = 12
-        Text = 'Horizontal'
-        Items.Strings = (
-          'Horizontal'
-          'Vertical')
       end
     end
   end
